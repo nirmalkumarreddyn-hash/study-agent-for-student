@@ -333,7 +333,7 @@ LLM = LLMClient()
 # GOOGLE GEMINI CLIENT (Powers the AI Doubt Solver Chatbot & Dynamic MCQs)
 # ==============================================================================
 class GeminiClient:
-    MODEL = os.environ.get("STUDY_AGENT_GEMINI_MODEL", "gemini-2.5-flash")
+    MODEL = os.environ.get("STUDY_AGENT_GEMINI_MODEL", "gemini-3.5-flash")
 
     def __init__(self) -> None:
         self._client: Any = None
