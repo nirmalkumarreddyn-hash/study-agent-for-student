@@ -26,17 +26,25 @@ import gradio as gr
 from pydantic import BaseModel, Field
 
 # ==============================================================================
-# OPENAI API KEY CONFIGURATION
-# Paste your OpenAI API key below to enable dynamic AI MCQ generation:
-OPENAI_API_KEY = ""   # <-- PASTE YOUR OPENAI API KEY HERE (e.g. "sk-proj-...")
+# API KEY CONFIGURATION (GEMINI & OPENAI)
 # ==============================================================================
+# Paste your Google Gemini API key below (powers the AI Doubt Solver Chatbot & MCQs):
+GEMINI_API_KEY = ""   # <-- PASTE YOUR GEMINI API KEY HERE (e.g. "AIzaSy...")
+
+# Or paste your OpenAI API key below (optional alternative):
+OPENAI_API_KEY = ""   # <-- Optional OpenAI key (e.g. "sk-proj-...")
+# ==============================================================================
+
+if GEMINI_API_KEY.strip():
+    os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY.strip()
 
 if OPENAI_API_KEY.strip():
     os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY.strip()
 else:
     try:
         from google.colab import userdata  # type: ignore
-        os.environ.setdefault("OPENAI_API_KEY", userdata.get("OPENAI_API_KEY"))
+        os.environ.setdefault("GEMINI_API_KEY", userdata.get("GEMINI_API_KEY", ""))
+        os.environ.setdefault("OPENAI_API_KEY", userdata.get("OPENAI_API_KEY", ""))
     except Exception:
         pass
 
@@ -320,6 +328,77 @@ class LLMClient:
             return None
 
 LLM = LLMClient()
+
+# ==============================================================================
+# GOOGLE GEMINI CLIENT (Powers the AI Doubt Solver Chatbot & Dynamic MCQs)
+# ==============================================================================
+class GeminiClient:
+    MODEL = os.environ.get("STUDY_AGENT_GEMINI_MODEL", "gemini-2.5-flash")
+
+    def __init__(self) -> None:
+        self._client: Any = None
+        self.last_error = ""
+        self.refresh()
+
+    def refresh(self, api_key: str = "") -> None:
+        key = (api_key or "").strip() or GEMINI_API_KEY.strip() or os.environ.get("GEMINI_API_KEY", "").strip()
+        self._client = None
+        self.last_error = ""
+        if key:
+            os.environ["GEMINI_API_KEY"] = key
+            try:
+                from google import genai
+                self._client = genai.Client(api_key=key)
+            except Exception as exc:
+                self.last_error = f"Gemini initialization error: {exc}"
+
+    @property
+    def live(self) -> bool:
+        if self._client is None:
+            self.refresh()
+        return self._client is not None
+
+    def generate(self, prompt: str, system_instruction: str = "") -> str | None:
+        if not self.live:
+            return None
+        models_to_try = [self.MODEL, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+        for m in models_to_try:
+            try:
+                config = {}
+                if system_instruction:
+                    config["system_instruction"] = system_instruction
+                resp = self._client.models.generate_content(
+                    model=m,
+                    contents=prompt,
+                    config=config if config else None
+                )
+                if resp and resp.text:
+                    self.last_error = ""
+                    return resp.text
+            except Exception as exc:
+                self.last_error = str(exc)
+                continue
+        return None
+
+    def json_chat(self, system: str, user: str) -> dict | None:
+        if not self.live:
+            return None
+        prompt = (
+            f"Instructions: {system}\n\n"
+            f"User Request: {user}\n\n"
+            f"Return ONLY a valid JSON object matching the requested schema. Do NOT wrap in markdown code fences."
+        )
+        raw = self.generate(prompt)
+        if not raw:
+            return None
+        try:
+            cleaned = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.MULTILINE)
+            cleaned = re.sub(r"\s*```$", "", cleaned.strip(), flags=re.MULTILINE)
+            return json.loads(cleaned)
+        except Exception:
+            return None
+
+GEMINI = GeminiClient()
 
 # ==============================================================================
 # DOCUMENT EXTRACTION & DIAGNOSTIC ANALYZER
@@ -1108,52 +1187,78 @@ def generate_procedural_syllabus_mcq(t: TopicState) -> QuizQuestion:
     )
 
 def generate_dynamic_mcq(llm: LLMClient, t: TopicState) -> QuizQuestion:
-    """Dynamically generates an MCQ based on syllabus topics using OpenAI LLM if available, or syllabus procedural synthesis."""
+    """Dynamically generates an MCQ based on syllabus topics using Gemini or OpenAI LLM if available, or syllabus procedural synthesis."""
     import random
-    if not llm.live:
-        llm.refresh()
+    GEMINI.refresh()
+    llm.refresh()
 
+    prereqs = CURRICULUM.get(t.subject, {}).get(t.name, (0.5, []))[1]
+    prereq_str = f"Relevant syllabus prerequisites: {', '.join(prereqs)}." if prereqs else ""
+
+    angles = [
+        "practical scenario and edge-case failure analysis",
+        "asymptotic performance, trade-offs, and optimization",
+        "formal architectural principles and technical definition",
+        "comparative analysis with related engineering mechanisms",
+        "common student misconceptions and tricky bug traps"
+    ]
+    chosen_angle = random.choice(angles)
+    seed_id = random.randint(10000, 99999)
+
+    system_prompt = (
+        "You are an expert university professor and exam setter for B.Tech Computer Science & Engineering. "
+        "Craft an original, fresh, and challenging Multiple Choice Question (MCQ) testing deep conceptual understanding of the "
+        "given syllabus module. Reply ONLY with a valid JSON object matching this schema:\n"
+        "{\n"
+        '  "question": "<detailed question text testing core mechanics, algorithms, formulas, or trade-offs>",\n'
+        '  "options": ["A) <opt A>", "B) <opt B>", "C) <opt C>", "D) <opt D>"],\n'
+        '  "correct_option": "<exact matching text of the correct option, e.g. A) ...>",\n'
+        '  "explanation": "<thorough technical explanation of why the correct option is right and others are incorrect>"\n'
+        "}\n"
+        "Rules:\n"
+        "- Exactly 4 options starting with A), B), C), D).\n"
+        "- Ensure all distractors are plausible and pedagogically meaningful.\n"
+        "- Output raw JSON only. Do NOT use markdown code fences."
+    )
+
+    user_prompt = (
+        f"Subject: {t.subject}\n"
+        f"Syllabus Module: {t.name}\n"
+        f"Difficulty: {t.difficulty:.2f} (0.3=Foundational, 0.7=Advanced B.Tech level)\n"
+        f"Question Focus Angle: {chosen_angle}\n"
+        f"Random Variation Seed: {seed_id}\n"
+        f"{prereq_str}\n\n"
+        f"Generate a brand new, unique exam-level Multiple Choice Question for this syllabus module."
+    )
+
+    # 1. Try Gemini first
+    if GEMINI.live:
+        data = GEMINI.json_chat(system_prompt, user_prompt)
+        if data and isinstance(data, dict):
+            raw_opts = data.get("options")
+            if isinstance(raw_opts, list) and len(raw_opts) == 4:
+                q_text = str(data.get("question", "")).strip()
+                opts = [str(o).strip() for o in raw_opts]
+                corr = str(data.get("correct_option", "")).strip()
+                expl = str(data.get("explanation", "Standard syllabus reference solution.")).strip()
+
+                if not any(corr.startswith(p) for p in ["A)", "B)", "C)", "D)"]):
+                    for opt in opts:
+                        if corr.lower() in opt.lower():
+                            corr = opt
+                            break
+                    else:
+                        corr = opts[0]
+
+                if q_text and all(opts):
+                    return QuizQuestion(
+                        topic=t.name, subject=t.subject, question=q_text,
+                        options=opts, correct_option=corr, explanation=expl,
+                        source="Gemini Generated"
+                    )
+
+    # 2. Try OpenAI second
     if llm.live:
-        prereqs = CURRICULUM.get(t.subject, {}).get(t.name, (0.5, []))[1]
-        prereq_str = f"Relevant syllabus prerequisites: {', '.join(prereqs)}." if prereqs else ""
-
-        # Diverse angles for generation so repeated questions never happen
-        angles = [
-            "practical scenario and edge-case failure analysis",
-            "asymptotic performance, trade-offs, and optimization",
-            "formal architectural principles and technical definition",
-            "comparative analysis with related engineering mechanisms",
-            "common student misconceptions and tricky bug traps"
-        ]
-        chosen_angle = random.choice(angles)
-        seed_id = random.randint(10000, 99999)
-
-        system_prompt = (
-            "You are an expert university professor and exam setter for B.Tech Computer Science & Engineering. "
-            "Craft an original, fresh, and challenging Multiple Choice Question (MCQ) testing deep conceptual understanding of the "
-            "given syllabus module. Reply ONLY with a valid JSON object matching this schema:\n"
-            "{\n"
-            '  "question": "<detailed question text testing core mechanics, algorithms, formulas, or trade-offs>",\n'
-            '  "options": ["A) <opt A>", "B) <opt B>", "C) <opt C>", "D) <opt D>"],\n'
-            '  "correct_option": "<exact matching text of the correct option, e.g. A) ...>",\n'
-            '  "explanation": "<thorough technical explanation of why the correct option is right and others are incorrect>"\n'
-            "}\n"
-            "Rules:\n"
-            "- Exactly 4 options starting with A), B), C), D).\n"
-            "- Ensure all distractors are plausible and pedagogically meaningful.\n"
-            "- Output raw JSON only. Do NOT use markdown code fences."
-        )
-
-        user_prompt = (
-            f"Subject: {t.subject}\n"
-            f"Syllabus Module: {t.name}\n"
-            f"Difficulty: {t.difficulty:.2f} (0.3=Foundational, 0.7=Advanced B.Tech level)\n"
-            f"Question Focus Angle: {chosen_angle}\n"
-            f"Random Variation Seed: {seed_id}\n"
-            f"{prereq_str}\n\n"
-            f"Generate a brand new, unique exam-level Multiple Choice Question for this syllabus module."
-        )
-
         data = llm.json_chat(system_prompt, user_prompt, temperature=0.85)
         if data and isinstance(data, dict):
             raw_opts = data.get("options")
@@ -1178,7 +1283,9 @@ def generate_dynamic_mcq(llm: LLMClient, t: TopicState) -> QuizQuestion:
                         source="OpenAI Generated"
                     )
 
+    # 3. Procedural syllabus fallback
     return generate_procedural_syllabus_mcq(t)
+
 
 class EvaluatorAgent(ReActAgent):
     name = "Evaluator Agent"
@@ -1554,12 +1661,34 @@ def answer_doubt(history: list[dict[str, str]], user_msg: str, orch: Orchestrato
     history = list(history or [])
     history.append({"role": "user", "content": query})
 
-    if LLM.live:
-        sys_prompt = (
-            "You are an encouraging, expert B.Tech computer science and engineering tutor. "
-            "Explain doubts simply, clearly, and concisely with step-by-step math or C++ code snippets where applicable. "
-            "Subjects: Probability and Statistics, DSA C++, ADBMS, Fundamentals of AI."
+    sys_prompt = (
+        "You are an encouraging, expert B.Tech Computer Science and Engineering tutor and professor. "
+        "Answer student doubts with clarity, depth, and pedagogical precision. "
+        "Cover theoretical foundations, step-by-step mathematical calculations, C++ code examples, "
+        "relational schemas/SQL queries, or search tree diagrams where appropriate. "
+        "Curriculum Subjects: Probability and Statistics, DSA C++, ADBMS, Fundamentals of AI."
+    )
+
+    # 1. Try Gemini API first (Primary for Chatbot)
+    GEMINI.refresh()
+    if GEMINI.live:
+        context_lines = []
+        for m in history[-6:]:
+            speaker = "Student" if m["role"] == "user" else "Tutor"
+            context_lines.append(f"{speaker}: {m['content']}")
+        chat_context = "\n".join(context_lines)
+        prompt = (
+            f"Conversation History:\n{chat_context}\n\n"
+            f"Student's Question:\n{query}\n\n"
+            f"Provide a comprehensive, clear, and step-by-step explanation:"
         )
+        bot_reply = GEMINI.generate(prompt, system_instruction=sys_prompt)
+        if bot_reply and bot_reply.strip():
+            history.append({"role": "assistant", "content": bot_reply.strip()})
+            return history, ""
+
+    # 2. Try OpenAI API as fallback
+    if LLM.live:
         chat_msgs = [{"role": "system", "content": sys_prompt}]
         for m in history[-6:]:
             chat_msgs.append({"role": m["role"], "content": m["content"]})
@@ -1570,12 +1699,20 @@ def answer_doubt(history: list[dict[str, str]], user_msg: str, orch: Orchestrato
                 messages=chat_msgs
             )
             bot_reply = r.choices[0].message.content
-            history.append({"role": "assistant", "content": bot_reply})
-            return history, ""
+            if bot_reply and bot_reply.strip():
+                history.append({"role": "assistant", "content": bot_reply.strip()})
+                return history, ""
         except Exception:
             pass
 
+    # 3. Offline knowledge base and syllabus concept guide
     bot_reply = resolve_doubt_offline(query, orch)
+    if not GEMINI.live and not LLM.live:
+        bot_reply += (
+            "\n\n---\n"
+            "💡 *Tip: Paste your Gemini API key in `GEMINI_API_KEY` at line 31 of `study_planner_agent_for_students.py` "
+            "to unlock full live Gemini AI tutoring for any question!*"
+        )
     history.append({"role": "assistant", "content": bot_reply})
     return history, ""
 
@@ -2012,16 +2149,32 @@ def make_quiz(orch, subject_filter, n):
             title_updates.append("")
             radio_updates.append(gr.update(visible=False, choices=[], value=None))
 
+    gemini_count = sum(1 for q in qs if q.source == "Gemini Generated")
     openai_count = sum(1 for q in qs if q.source == "OpenAI Generated")
-    if openai_count > 0:
+
+    for i in range(max_q):
+        if i < len(qs):
+            q = qs[i]
+            if q.source == "Gemini Generated":
+                tag = "🤖 Gemini AI"
+            elif q.source == "OpenAI Generated":
+                tag = "🤖 OpenAI"
+            else:
+                tag = "📚 Syllabus"
+            title_updates[i] = f"### Q{i + 1}. {q.topic} `[{q.subject}]` *({tag})*\n**{q.question}**"
+
+    if gemini_count > 0:
+        status_msg = f"**🤖 Dynamically generated by Google Gemini ({GEMINI.MODEL}): {len(qs)} fresh questions.** Select your options and click Submit below."
+    elif openai_count > 0:
         status_msg = f"**🤖 Dynamically generated by OpenAI ({LLM.MODEL}): {len(qs)} fresh questions.** Select your options and click Submit below."
-    elif LLM.last_error:
+    elif GEMINI.last_error or LLM.last_error:
+        err = GEMINI.last_error or LLM.last_error
         status_msg = (
-            f"**⚠️ OpenAI Notice:** {LLM.last_error}<br>"
+            f"**⚠️ AI Notice:** {err}<br>"
             f"*(Generated {len(qs)} diverse questions using dynamic syllabus engine with randomized options.)*"
         )
     else:
-        status_msg = f"**📚 Dynamically generated from Syllabus: {len(qs)} Questions.** (Paste a valid OpenAI API key in code to enable live AI generation)."
+        status_msg = f"**📚 Dynamically generated from Syllabus: {len(qs)} Questions.** (Paste your Gemini API key in code to enable live AI generation)."
 
     return (orch, status_msg, *group_updates, *title_updates, *radio_updates, gr.update(visible=bool(qs)), "", *view(orch))
 
@@ -2163,7 +2316,7 @@ with gr.Blocks(theme=THEME, css=CSS, title="AI Study Planner & Performance Agent
                     analytics_html = gr.HTML(EMPTY)
 
             # Interactive AI Doubt Solver Chatbot
-            with gr.Accordion("🤖 AI Doubt Solver & Concept Tutor (Ask any doubt)", open=True):
+            with gr.Accordion("🤖 Gemini AI Doubt Solver & Concept Tutor (Ask any doubt)", open=True):
                 gr.Markdown("Have a doubt about an MCQ question, why an option was right or wrong, or a B.Tech concept? Ask below:")
                 chatbot = gr.Chatbot(label="Study Doubts Chatbot", height=320, type="messages")
                 with gr.Row():
