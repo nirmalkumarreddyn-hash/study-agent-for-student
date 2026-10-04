@@ -27,8 +27,8 @@ from pydantic import BaseModel, Field
 
 # ==============================================================================
 # OPENAI API KEY CONFIGURATION
-# Provide your OpenAI API key below directly (Leave empty to use the offline engine):
-OPENAI_API_KEY = ""   # e.g. "sk-proj-..."
+# Paste your OpenAI API key below to enable dynamic AI MCQ generation:
+OPENAI_API_KEY = "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"   # <-- PASTE YOUR OPENAI API KEY HERE (e.g. "sk-proj-...")
 # ==============================================================================
 
 if OPENAI_API_KEY.strip():
@@ -96,260 +96,6 @@ CURRICULUM: dict[str, dict[str, tuple[float, list[str]]]] = {
         "Module - IX: General Model of Learning Agents": (0.65, ["Module - I: Introduction to Artificial Intelligence"]),
         "Module - X: Applications of AI": (0.45, ["Module - IX: General Model of Learning Agents"]),
     },
-}
-
-# ==============================================================================
-# COMPREHENSIVE MULTIPLE CHOICE QUESTION (MCQ) BANK (40 Modules)
-# ==============================================================================
-# Mapping: Topic -> (Question, [Option A, Option B, Option C, Option D], Correct_Option, Explanation)
-MCQ_QUESTION_BANK: dict[str, tuple[str, list[str], str, str]] = {
-    # --- Probability and Statistics ---
-    "Module I: Introduction to Statistics": (
-        "Which of the following measures of central tendency is least sensitive to extreme outliers in a skewed dataset?",
-        ["A) Arithmetic Mean", "B) Median", "C) Mid-range", "D) Standard Deviation"],
-        "B) Median",
-        "The median is positional (representing the 50th percentile) and is not affected by extreme outlier values, unlike the arithmetic mean."
-    ),
-    "Module II: Introduction to Probability": (
-        "If two events A and B are mutually exclusive with P(A) = 0.35 and P(B) = 0.45, what is P(A ∩ B)?",
-        ["A) 0.1575", "B) 0.80", "C) 0.00", "D) 0.10"],
-        "C) 0.00",
-        "By definition, mutually exclusive events cannot occur simultaneously, meaning their joint intersection P(A ∩ B) is strictly 0."
-    ),
-    "Module III: Random Variables": (
-        "For any discrete random variable X with Probability Mass Function P(X = x), which condition must always hold?",
-        ["A) P(X = x) can be negative if x < 0", "B) Sum of all P(X = x) equals 1 and each P(X = x) >= 0", "C) Integral of P(X = x) from -inf to +inf equals 1", "D) P(X = x) must be strictly greater than 0.5"],
-        "B) Sum of all P(X = x) equals 1 and each P(X = x) >= 0",
-        "A valid PMF must satisfy two axioms: non-negativity (P(X = x) >= 0) and total probability summation equal to 1."
-    ),
-    "Module IV: Discrete Probability Distributions": (
-        "In a Poisson distribution with parameter lambda = 6, what are its Mean and Variance respectively?",
-        ["A) Mean = 6, Variance = 36", "B) Mean = 6, Variance = 6", "C) Mean = 36, Variance = 6", "D) Mean = 6, Variance = sqrt(6)"],
-        "B) Mean = 6, Variance = 6",
-        "A distinctive mathematical property of the Poisson distribution is that both its Mean and Variance are equal to lambda."
-    ),
-    "Module V: Continuous Probability Distributions": (
-        "A random variable X follows N(mu = 40, sigma = 8). What is the standard normal Z-score for X = 56?",
-        ["A) Z = 1.5", "B) Z = 2.0", "C) Z = 2.5", "D) Z = -2.0"],
-        "B) Z = 2.0",
-        "Formula: Z = (X - mu) / sigma = (56 - 40) / 8 = 16 / 8 = 2.0."
-    ),
-    "Module VI: Sampling & Estimation": (
-        "According to the Central Limit Theorem (CLT), as sample size n increases (n >= 30), what distribution does the sample mean approach?",
-        ["A) Uniform Distribution", "B) Normal Distribution", "C) Exponential Distribution", "D) Poisson Distribution"],
-        "B) Normal Distribution",
-        "The CLT states that the sampling distribution of the sample mean approaches a Normal Distribution as n becomes large, regardless of population shape."
-    ),
-    "Module VII: Testing of Hypothesis – I": (
-        "In statistical hypothesis testing, what constitutes a Type I Error?",
-        ["A) Accepting the null hypothesis when it is false", "B) Rejecting the null hypothesis when it is actually true", "C) Using a one-tailed test instead of a two-tailed test", "D) Increasing sample size unnecessarily"],
-        "B) Rejecting the null hypothesis when it is actually true",
-        "Type I error occurs when a true null hypothesis (H0) is incorrectly rejected (probability alpha = significance level)."
-    ),
-    "Module VIII: Testing of Hypothesis – II": (
-        "When comparing a sample mean to a population mean with small sample size (n < 30) and unknown population standard deviation, which test is appropriate?",
-        ["A) Z-test", "B) Student's t-test", "C) F-test", "D) Chi-Square Independence test"],
-        "B) Student's t-test",
-        "The Student's t-test accounts for extra variability when the population standard deviation is unknown and estimated using sample standard deviation s for small n."
-    ),
-    "Module IX: Correlation": (
-        "Karl Pearson's linear correlation coefficient r is mathematically constrained within which boundaries?",
-        ["A) [0, 1]", "B) [-1, +1]", "C) [-inf, +inf]", "D) [-0.5, +0.5]"],
-        "B) [-1, +1]",
-        "Pearson's r strictly ranges from -1 (perfect negative linear correlation) through 0 (no linear correlation) to +1 (perfect positive correlation)."
-    ),
-    "Module X: Regression": (
-        "In the simple linear regression equation Y = a + bX, what does the coefficient b represent?",
-        ["A) Value of Y when X is 0", "B) Expected change in Y per unit increase in X", "C) Total sum of squared errors", "D) Pearson correlation squared"],
-        "B) Expected change in Y per unit increase in X",
-        "Coefficient b is the slope of the regression line, representing Delta(Y) / Delta(X)."
-    ),
-
-    # --- DSA C++ ---
-    "Module I: Introduction to C++ Programming": (
-        "Which OOP pillar in C++ restricts direct access to an object's internal fields to enforce data hiding?",
-        ["A) Polymorphism", "B) Encapsulation", "C) Dynamic Binding", "D) Template Specialization"],
-        "B) Encapsulation",
-        "Encapsulation wraps data and methods together inside a class and controls access using private and protected specifiers."
-    ),
-    "Module II: Control Statements": (
-        "What occurs if a matching 'case' in a C++ switch statement omits the 'break;' statement?",
-        ["A) Compilation error", "B) Execution falls through into subsequent case blocks", "C) Program terminates immediately", "D) Infinite loop on that case"],
-        "B) Execution falls through into subsequent case blocks",
-        "Without 'break;', C++ continues executing subsequent case statements sequentially regardless of their case values (fall-through behavior)."
-    ),
-    "Module III: Arrays – 1D": (
-        "For an array `int arr[8]` with base address 2000 and `sizeof(int) = 4` bytes, what is the address of `arr[5]`?",
-        ["A) 2016", "B) 2020", "C) 2024", "D) 2032"],
-        "B) 2020",
-        "Address(arr[i]) = Base + i * sizeof(type) = 2000 + 5 * 4 = 2020."
-    ),
-    "Module IV: Arrays – 2D": (
-        "In Row-Major Order for a 2D array A[Rows][Cols], how is the memory offset of element A[i][j] computed?",
-        ["A) (i * Cols + j) * size", "B) (j * Rows + i) * size", "C) (i * Rows + j) * size", "D) (i + j) * size"],
-        "A) (i * Cols + j) * size",
-        "In Row-Major order, rows are placed sequentially. Before row i, there are i complete rows of size Cols, plus j columns in row i."
-    ),
-    "Module V: String Arrays": (
-        "Which sentinel character automatically marks the termination of a standard C-style character string in memory?",
-        ["A) '\\n'", "B) '\\0' (null character)", "C) EOF", "D) ' ' (space)"],
-        "B) '\\0' (null character)",
-        "C-style strings are null-terminated character sequences ending with byte 0x00 ('\\0')."
-    ),
-    "Module VI: Structures": (
-        "In C++, what is the only syntactic difference between a `struct` and a `class`?",
-        ["A) Structs cannot define constructors", "B) Struct members are public by default; class members are private by default", "C) Structs cannot participate in inheritance", "D) Structs cannot contain pointer members"],
-        "B) Struct members are public by default; class members are private by default",
-        "In C++, structs and classes are functionally identical except that structs default to public member access and public inheritance."
-    ),
-    "Module VII: Data Structures performance Analysis": (
-        "What are the worst-case time complexities of Linear Search and Binary Search on an array of size n?",
-        ["A) O(1) and O(log n)", "B) O(n) and O(log n)", "C) O(log n) and O(n)", "D) O(n) and O(n)"],
-        "B) O(n) and O(log n)",
-        "Linear search checks up to n elements sequentially (O(n)), whereas binary search halves the search space each step (O(log n))."
-    ),
-    "Module VIII: Stacks": (
-        "Which of the following problems is NOT traditionally solved using a Stack (LIFO) data structure?",
-        ["A) Infix to Postfix expression conversion", "B) Function call stack and recursion", "C) CPU Round-Robin process scheduling", "D) Checking balanced parentheses in source code"],
-        "C) CPU Round-Robin process scheduling",
-        "Round-robin scheduling requires a First-In-First-Out (FIFO) Queue, not a Last-In-First-Out Stack."
-    ),
-    "Module IX: Queues": (
-        "In a circular queue implemented using an array of size N with front and rear indices, what formula checks if the queue is full?",
-        ["A) (rear + 1) % N == front", "B) rear == front", "C) rear == N - 1", "D) front == -1"],
-        "A) (rear + 1) % N == front",
-        "Circular queues wrap around using modulo arithmetic. When advancing rear by one modulo N meets front, the queue is full."
-    ),
-    "Module X: STL Fundamentals & Containers": (
-        "Which C++ STL container guarantees O(1) random index access `v[i]` and amortized O(1) insertion at the back?",
-        ["A) std::list", "B) std::vector", "C) std::set", "D) std::map"],
-        "B) std::vector",
-        "std::vector manages a contiguous dynamic buffer, supporting O(1) random access by index and amortized O(1) `push_back()`."
-    ),
-
-    # --- ADBMS ---
-    "Module 1: Relational Query Languages & Extended ER Models": (
-        "Which fundamental Relational Algebra operator filters rows/tuples according to a selection predicate?",
-        ["A) Project (pi)", "B) Select (sigma)", "C) Cartesian Product (x)", "D) Rename (rho)"],
-        "B) Select (sigma)",
-        "The Select operator sigma extracts tuples that satisfy a given conditional expression (analogous to SQL WHERE clause)."
-    ),
-    "Module 2: Fundamentals of Normalization": (
-        "A database table is in Second Normal Form (2NF) if it is in 1NF and contains no:",
-        ["A) Transitive dependencies", "B) Partial functional dependencies on composite candidate keys", "C) Multi-valued dependencies", "D) Foreign keys"],
-        "B) Partial functional dependencies on composite candidate keys",
-        "2NF prevents non-prime attributes from depending on only a proper subset of any candidate key."
-    ),
-    "Module 3: Advanced Normalization": (
-        "Under Boyce-Codd Normal Form (BCNF), for every non-trivial functional dependency X -> Y, what must X be?",
-        ["A) A superkey", "B) A foreign key", "C) A non-prime attribute", "D) A secondary index"],
-        "A) A superkey",
-        "BCNF enforces that every determinant X in non-trivial dependencies X -> Y must be a candidate key or superkey."
-    ),
-    "Module 4: Transactions in DBMS": (
-        "Which ACID transaction property guarantees that committed updates will survive system crashes and power failures?",
-        ["A) Atomicity", "B) Consistency", "C) Isolation", "D) Durability"],
-        "D) Durability",
-        "Durability ensures that once a transaction successfully commits, its changes are written to non-volatile storage and will never be lost."
-    ),
-    "Module 5: Concurrency Control": (
-        "Under the Strict Two-Phase Locking (Strict 2PL) protocol, when does a transaction release its exclusive (write) locks?",
-        ["A) Immediately after writing each data item", "B) During the shrinking phase before commit", "C) Only after the transaction terminates (commit or abort)", "D) When another transaction waits for it"],
-        "C) Only after the transaction terminates (commit or abort)",
-        "Strict 2PL holds exclusive locks until commit or abort to prevent cascading aborts (dirty reads)."
-    ),
-    "Module 6: Storage and File Structure": (
-        "In a standard B+ Tree index file organization, where are the pointers to the actual data records stored?",
-        ["A) Uniformly in all root, internal and leaf nodes", "B) Exclusively in the leaf nodes", "C) Exclusively in the root node", "D) In a separate hash overflow bucket"],
-        "B) Exclusively in the leaf nodes",
-        "In a B+ Tree, internal nodes strictly store navigation keys, while all actual data pointers reside in leaf nodes, linked sequentially."
-    ),
-    "Module 7: Database Recovery Techniques": (
-        "In log-based recovery with Deferred Database Modification, which operation is performed during crash recovery?",
-        ["A) Both UNDO and REDO", "B) Only REDO for committed transactions", "C) Only UNDO for uncommitted transactions", "D) Re-indexing all tables"],
-        "B) Only REDO for committed transactions",
-        "In deferred modification, database updates are only applied to disk after commit, so uncommitted transactions never wrote to disk and need no UNDO."
-    ),
-    "Module 8: Introduction to NoSQL Databases and MongoDB": (
-        "According to Brewer's CAP Theorem, what are the three properties where distributed databases can guarantee at most two simultaneously?",
-        ["A) Concurrency, Atomicity, Partitioning", "B) Consistency, Availability, Partition Tolerance", "C) Correctness, Access, Performance", "D) Cache, Aggregation, Persistence"],
-        "B) Consistency, Availability, Partition Tolerance",
-        "The CAP theorem states that under network partitions, a distributed system must choose between Consistency and Availability."
-    ),
-    "Module 9: Performing CRUD Operations in MongoDB": (
-        "Which MongoDB update operator modifies specific fields in a document without overwriting the entire document?",
-        ["A) $replace", "B) $set", "C) $push", "D) $upsert"],
-        "B) $set",
-        "The `$set` operator updates the specified fields with new values while preserving all untouched fields in the document."
-    ),
-    "Module 10: Advanced Querying and Data Aggregation in MongoDB": (
-        "In the MongoDB Aggregation Pipeline, which stage performs a left outer join to another collection?",
-        ["A) $match", "B) $group", "C) $lookup", "D) $project"],
-        "C) $lookup",
-        "The `$lookup` stage performs a left outer join between documents in the current collection and a foreign collection in the same database."
-    ),
-
-    # --- Fundamentals of AI (FAI) ---
-    "Module - I: Introduction to Artificial Intelligence": (
-        "In artificial intelligence agent design, what does the acronym PEAS stand for?",
-        ["A) Perception, Environment, Actions, Storage", "B) Performance measure, Environment, Actuators, Sensors", "C) Planning, Execution, Architecture, States", "D) Process, Efficiency, Algorithms, System"],
-        "B) Performance measure, Environment, Actuators, Sensors",
-        "PEAS formally specifies the task environment: Performance measure, Environment, Actuators, and Sensors."
-    ),
-    "Module - II: Uninformed Search Strategies": (
-        "What is the key benefit of Iterative Deepening Search (IDS) over Breadth-First Search (BFS)?",
-        ["A) It requires smaller time complexity", "B) Combines completeness and optimality of BFS with linear space complexity O(bd) of DFS", "C) It uses a heuristic function", "D) Works on weighted graphs only"],
-        "B) Combines completeness and optimality of BFS with linear space complexity O(bd) of DFS",
-        "IDS explores depth boundaries iteratively, achieving the shallowest-goal optimality of BFS without the exponential memory footprint of BFS."
-    ),
-    "Module - III: Informed Search Strategies": (
-        "In A* search with evaluation function f(n) = g(n) + h(n), what property must h(n) satisfy to guarantee optimality in tree search?",
-        ["A) h(n) must be monotonic only", "B) h(n) must be admissible (never overestimates the true cost to goal)", "C) h(n) must equal g(n)", "D) h(n) must be strictly greater than true cost"],
-        "B) h(n) must be admissible (never overestimates the true cost to goal)",
-        "An admissible heuristic never overestimates the actual cost, ensuring A* will never expand a suboptimal goal before the optimal one."
-    ),
-    "Module - IV: Optimal Decisions in Games": (
-        "In the Minimax game algorithm, what is the exact effect of Alpha-Beta Pruning?",
-        ["A) It changes the final move chosen by Minimax", "B) Prunes branches that cannot influence the final decision without changing the optimal move", "C) Converts deterministic games into stochastic games", "D) Eliminates the need for a terminal utility function"],
-        "B) Prunes branches that cannot influence the final decision without changing the optimal move",
-        "Alpha-beta pruning eliminates subtrees that are demonstrably worse than currently known alternatives, maintaining exact optimal decision making."
-    ),
-    "Module - V: Inferences": (
-        "Which fundamental deductive rule of inference states: If P is true and P => Q is true, then Q must be true?",
-        ["A) Modus Tollens", "B) Modus Ponens", "C) Resolution", "D) Disjunctive Syllogism"],
-        "B) Modus Ponens",
-        "Modus Ponens (affirming the antecedent) is the classic rule of propositional inference: P and P => Q entails Q."
-    ),
-    "Module - VI: Knowledge Representation & Reasoning": (
-        "What ontological capability differentiates First-Order Logic (FOL) from Propositional Logic?",
-        ["A) FOL cannot express boolean truth values", "B) FOL represents objects, relations, and quantifiers (forall, exists)", "C) FOL is strictly non-deterministic", "D) FOL does not support implication"],
-        "B) FOL represents objects, relations, and quantifiers (forall, exists)",
-        "FOL adds predicates, functions, objects, and universal/existential quantifiers, allowing concise statements about domains."
-    ),
-    "Module - VII: State Space Planning": (
-        "In classical STRIPS / PDDL planning representations, what three components define an Action schema?",
-        ["A) Preconditions, Add-List, Delete-List", "B) Heuristic, Search Queue, Cost", "C) Weight Matrix, Bias, Activation", "D) Sensor, Percept, Actuator"],
-        "A) Preconditions, Add-List, Delete-List",
-        "STRIPS actions define Preconditions (must hold before action), Add-List (predicates made true), and Delete-List (predicates made false)."
-    ),
-    "Module - VIII: Uncertainty in AI": (
-        "In a Bayesian Network (Directed Acyclic Graph), what does each individual node represent?",
-        ["A) A deterministic logical clause", "B) A random variable paired with a Conditional Probability Table (CPT)", "C) A physical agent actuator", "D) A state in an adversarial search tree"],
-        "B) A random variable paired with a Conditional Probability Table (CPT)",
-        "Each node in a Bayesian Network corresponds to a random variable, storing a CPT representing P(X | Parents(X))."
-    ),
-    "Module - IX: General Model of Learning Agents": (
-        "In a general learning agent architecture, which component is explicitly responsible for suggesting exploratory actions?",
-        ["A) Critic", "B) Problem Generator", "C) Performance Element", "D) Learning Element"],
-        "B) Problem Generator",
-        "The Problem Generator suggests novel exploratory actions so the agent explores sub-optimal states to discover better global solutions."
-    ),
-    "Module - X: Applications of AI": (
-        "What major ethical concern arises when deploying deep learning models for automated credit scoring or resume screening?",
-        ["A) Overfitting causing memory crashes", "B) Propagation and amplification of historical and demographic bias", "C) Violation of Markovian state assumptions", "D) High floating-point matrix multiplication cost"],
-        "B) Propagation and amplification of historical and demographic bias",
-        "ML models trained on biased historical human decisions can perpetuate discriminatory biases against specific groups unless audited."
-    ),
 }
 
 # ==============================================================================
@@ -541,6 +287,8 @@ class LLMClient:
 
     @property
     def live(self) -> bool:
+        if self._client is None:
+            self.refresh()
         return self._client is not None
 
     def json_chat(self, system: str, user: str) -> dict | None:
@@ -551,12 +299,13 @@ class LLMClient:
                 model=self.MODEL, temperature=0.3, response_format={"type": "json_object"},
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
             self.failures = 0
-            return json.loads(r.choices[0].message.content)
+            raw_text = r.choices[0].message.content or ""
+            raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text.strip(), flags=re.MULTILINE)
+            raw_text = re.sub(r"\s*```$", "", raw_text.strip(), flags=re.MULTILINE)
+            return json.loads(raw_text)
         except Exception as exc:
             self.last_error = str(exc)[:120]
             self.failures += 1
-            if self.failures >= 2:
-                self._client = None
             return None
 
 LLM = LLMClient()
@@ -1116,25 +865,116 @@ class SchedulerAgent(ReActAgent):
         return f"Compression level {mem['compressed']}: each module gets fewer sessions to fit the exam timeline."
 
 
-def bank_question(t: TopicState) -> QuizQuestion:
-    if t.name in MCQ_QUESTION_BANK:
-        quest, opts, corr, expl = MCQ_QUESTION_BANK[t.name]
-        return QuizQuestion(topic=t.name, subject=t.subject, question=quest, options=list(opts), correct_option=corr, explanation=expl, source="offline bank")
-    
-    # Generic MCQ fallback
+def generate_procedural_syllabus_mcq(t: TopicState) -> QuizQuestion:
+    """Procedurally synthesizes an MCQ directly from syllabus concepts when no OpenAI API key is active."""
+    clean_name = t.name.split(":")[-1].strip() if ":" in t.name else t.name
+    subject = t.subject
+
+    if "Probability" in subject or "Statistics" in subject:
+        question = f"In {subject}, which of the following statements is fundamentally correct regarding '{clean_name}'?"
+        options = [
+            f"A) The core analytical properties of {clean_name} satisfy formal probability axioms and valid sample space constraints.",
+            f"B) '{clean_name}' only applies to deterministic variables with zero variance.",
+            f"C) Distribution parameters and moments are invariant under arbitrary non-linear transformations in {clean_name}.",
+            f"D) '{clean_name}' cannot be analyzed using estimation or hypothesis testing."
+        ]
+        correct = options[0]
+        explanation = f"In Probability and Statistics, {clean_name} is governed by probability axioms, distribution laws, and rigorous parameter estimation."
+    elif "DSA" in subject or "C++" in subject:
+        question = f"In C++ Data Structures and Algorithms, what is the primary consideration when implementing '{clean_name}'?"
+        options = [
+            f"A) Balancing asymptotic time complexity (Big-O) and memory locality according to the access patterns of {clean_name}.",
+            f"B) '{clean_name}' always guarantees O(1) worst-case time for all operations without memory allocation.",
+            f"C) In modern C++, {clean_name} cannot be used alongside STL containers or standard iterators.",
+            f"D) Dynamic memory management and pointer boundaries can be ignored when working with {clean_name}."
+        ]
+        correct = options[0]
+        explanation = f"In C++ DSA, {clean_name} requires careful analysis of asymptotic complexity, pointer/reference semantics, and cache-friendly layout."
+    elif "ADBMS" in subject or "Database" in subject:
+        question = f"In Advanced Database Management Systems (ADBMS), what is the key design objective of '{clean_name}'?"
+        options = [
+            f"A) Ensuring transaction consistency, data integrity, and structural efficiency under concurrent access constraints in {clean_name}.",
+            f"B) Maximizing unnecessary data redundancy and permitting unconstrained transitive dependencies.",
+            f"C) Disabling transaction logs and bypassing ACID recovery protocols in {clean_name}.",
+            f"D) Restricting all schemas to un-normalized first normal form (1NF) indefinitely."
+        ]
+        correct = options[0]
+        explanation = f"In ADBMS, {clean_name} focuses on schema normalization, transactional isolation, concurrency control, or scalable distributed storage."
+    else:  # AI / FAI
+        question = f"In Artificial Intelligence, what is the principal role of '{clean_name}' in intelligent agent design?"
+        options = [
+            f"A) Formulating state representations and algorithmic search or inference strategies to reach goal states efficiently.",
+            f"B) Forcing the agent to select actions randomly without evaluating heuristic utility.",
+            f"C) Disallowing the use of knowledge representations and environmental percepts in {clean_name}.",
+            f"D) Eliminating exponential time complexity across all combinatorial state spaces."
+        ]
+        correct = options[0]
+        explanation = f"In Artificial Intelligence, {clean_name} provides structured state formulations, heuristic evaluation, or automated reasoning."
+
     return QuizQuestion(
-        topic=t.name, subject=t.subject,
-        question=f"Which of the following is the fundamental core concept underlying {t.name}?",
-        options=[
-            f"A) Standard theoretical model and formal definition of {t.name}",
-            "B) An unrelated peripheral heuristic",
-            "C) A deprecated archaic algorithm",
-            "D) Non-deterministic random guessing"
-        ],
-        correct_option=f"A) Standard theoretical model and formal definition of {t.name}",
-        explanation=f"Understanding the core principles and definitions of {t.name} is essential for engineering mastery.",
-        source="offline bank"
+        topic=t.name, subject=t.subject, question=question,
+        options=options, correct_option=correct, explanation=explanation,
+        source="Syllabus Synthesized"
     )
+
+def generate_dynamic_mcq(llm: LLMClient, t: TopicState) -> QuizQuestion:
+    """Dynamically generates an MCQ based on syllabus topics using OpenAI LLM if available, or syllabus procedural synthesis."""
+    if not llm.live:
+        llm.refresh()
+
+    if llm.live:
+        prereqs = CURRICULUM.get(t.subject, {}).get(t.name, (0.5, []))[1]
+        prereq_str = f"Relevant syllabus prerequisites: {', '.join(prereqs)}." if prereqs else ""
+
+        system_prompt = (
+            "You are an expert university professor and exam setter for B.Tech Computer Science & Engineering. "
+            "Craft an original, rigorous Multiple Choice Question (MCQ) testing deep conceptual understanding of the "
+            "given syllabus module. Reply ONLY with a valid JSON object matching this schema:\n"
+            "{\n"
+            '  "question": "<detailed question text testing core mechanics, algorithms, formulas, or trade-offs>",\n'
+            '  "options": ["A) <opt A>", "B) <opt B>", "C) <opt C>", "D) <opt D>"],\n'
+            '  "correct_option": "<exact matching text of the correct option, e.g. A) ...>",\n'
+            '  "explanation": "<thorough technical explanation of why the correct option is right and others are incorrect>"\n'
+            "}\n"
+            "Rules:\n"
+            "- Exactly 4 options starting with A), B), C), D).\n"
+            "- Ensure all distractors are plausible and pedagogically meaningful.\n"
+            "- Output raw JSON only. Do NOT use markdown code fences."
+        )
+
+        user_prompt = (
+            f"Subject: {t.subject}\n"
+            f"Syllabus Module: {t.name}\n"
+            f"Difficulty: {t.difficulty:.2f} (0.3=Foundational, 0.7=Advanced B.Tech level)\n"
+            f"{prereq_str}\n\n"
+            f"Generate an exam-level Multiple Choice Question for this syllabus module."
+        )
+
+        data = llm.json_chat(system_prompt, user_prompt)
+        if data and isinstance(data, dict):
+            raw_opts = data.get("options")
+            if isinstance(raw_opts, list) and len(raw_opts) == 4:
+                q_text = str(data.get("question", "")).strip()
+                opts = [str(o).strip() for o in raw_opts]
+                corr = str(data.get("correct_option", "")).strip()
+                expl = str(data.get("explanation", "Standard syllabus reference solution.")).strip()
+
+                if not any(corr.startswith(p) for p in ["A)", "B)", "C)", "D)"]):
+                    for opt in opts:
+                        if corr.lower() in opt.lower():
+                            corr = opt
+                            break
+                    else:
+                        corr = opts[0]
+
+                if q_text and all(opts):
+                    return QuizQuestion(
+                        topic=t.name, subject=t.subject, question=q_text,
+                        options=opts, correct_option=corr, explanation=expl,
+                        source="OpenAI Generated"
+                    )
+
+    return generate_procedural_syllabus_mcq(t)
 
 
 class EvaluatorAgent(ReActAgent):
@@ -1226,35 +1066,21 @@ class EvaluatorAgent(ReActAgent):
     def t_generate(self, mem):
         st, made = self.state, []
         for t in mem.get("topic_objs", []):
-            q = None
-            if self.llm.live:
-                data = self.llm.json_chat(
-                    'You are a university exam setter. Reply ONLY with JSON {"question": str, "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct_option": str, "explanation": str}. Exactly 4 options starting with A), B), C), D).',
-                    f"Subject: {t.subject}. Module: {t.name}. Difficulty: {t.difficulty}. Craft one high-quality Multiple Choice Question (MCQ).")
-                if data and isinstance(data.get("options"), list) and len(data["options"]) == 4:
-                    try:
-                        q = QuizQuestion(
-                            topic=t.name, subject=t.subject,
-                            question=str(data["question"]),
-                            options=[str(opt) for opt in data["options"]],
-                            correct_option=str(data["correct_option"]),
-                            explanation=str(data.get("explanation", "Reference solution")),
-                            source="LLM"
-                        )
-                    except Exception:
-                        q = None
-            q_final = q or bank_question(t)
+            q_final = generate_dynamic_mcq(self.llm, t)
             st.quiz.append(q_final)
             made.append(q_final.source)
         mem["generated"] = True
-        return f"Prepared {len(made)} MCQ question(s) ({made.count('LLM')} LLM, {made.count('offline bank')} offline bank)."
+        llm_count = sum(1 for s in made if "OpenAI" in s or "LLM" in s)
+        if llm_count > 0:
+            return f"Generated {len(made)} MCQ question(s) dynamically via OpenAI LLM based on syllabus."
+        return f"Generated {len(made)} MCQ question(s) dynamically from syllabus."
 
     def t_verify(self, mem):
         fixed = 0
         for i, q in enumerate(self.state.quiz):
             if len(q.options) < 4 or not q.correct_option:
                 t_obj = self.state.topics.get(q.topic) or TopicState(name=q.topic, subject=q.subject, difficulty=0.5)
-                self.state.quiz[i] = bank_question(t_obj)
+                self.state.quiz[i] = generate_dynamic_mcq(self.llm, t_obj)
                 fixed += 1
         mem["verified"] = True
         return f"Verified all MCQs ({fixed} repaired)."
@@ -1485,18 +1311,19 @@ def resolve_doubt_offline(query: str, orch: Orchestrator | None) -> str:
         if k in q_low:
             return v
 
-    for mod_name, (quest, opts, corr, expl) in MCQ_QUESTION_BANK.items():
-        core_topic = mod_name.split(":")[-1].strip().lower()
-        if core_topic in q_low or any(word in q_low for word in core_topic.split() if len(word) > 4):
-            opts_str = "\n".join(f"- {opt}" for opt in opts)
-            return (
-                f"### 📘 Concept Guide: {mod_name}\n\n"
-                f"**Typical MCQ Question:**\n*{quest}*\n\n"
-                f"**Options:**\n{opts_str}\n\n"
-                f"**Correct Option:** `{corr}`\n\n"
-                f"**Explanation:**\n{expl}\n\n"
-                f"💡 *Exam Tip:* Focus on the technical definition and edge cases."
-            )
+    for subj, mods in CURRICULUM.items():
+        for mod_name, (diff, prereqs) in mods.items():
+            core_topic = mod_name.split(":")[-1].strip().lower()
+            if core_topic in q_low or any(word in q_low for word in core_topic.split() if len(word) > 4):
+                prereq_str = ", ".join(prereqs) if prereqs else "None (Foundational Module)"
+                return (
+                    f"### 📘 Syllabus Concept Guide: {mod_name} ({subj})\n\n"
+                    f"- **Subject:** {subj}\n"
+                    f"- **Module:** {mod_name}\n"
+                    f"- **Difficulty Rating:** {int(diff * 100)}%\n"
+                    f"- **Prerequisites:** {prereq_str}\n\n"
+                    f"💡 *Exam Tip:* Focus on the core algorithmic steps, formulas, and typical MCQ scenarios for {mod_name}."
+                )
 
     return (
         f"### 💡 Doubt Resolution for: '{query}'\n\n"
@@ -1943,6 +1770,7 @@ def set_horizon(orch, horizon):
     return orch, render_table(orch.state, orch.horizon)
 
 def make_quiz(orch, subject_filter, n):
+    LLM.refresh()
     max_q = 10
     if _need_plan(orch):
         subs = [
@@ -1971,7 +1799,8 @@ def make_quiz(orch, subject_filter, n):
             title_updates.append("")
             radio_updates.append(gr.update(visible=False, choices=[], value=None))
 
-    status_msg = f"**Generated {len(qs)} Multiple Choice Questions.** Select your options and click Submit below."
+    source_note = "🤖 Dynamically generated by OpenAI LLM" if LLM.live else "📚 Dynamically generated from Syllabus"
+    status_msg = f"**{source_note}: {len(qs)} Questions.** Select your options and click Submit below."
     return (orch, status_msg, *group_updates, *title_updates, *radio_updates, gr.update(visible=bool(qs)), "", *view(orch))
 
 def submit_quiz(orch, *answers):
@@ -2171,5 +2000,6 @@ with gr.Blocks(theme=THEME, css=CSS, title="AI Study Planner & Performance Agent
     p_btn3.click(lambda h, o: answer_doubt(h, "What is the difference between Poisson and Binomial distributions and when is Poisson used as an approximation?", o), [chatbot, orch_state], [chatbot, chat_msg])
     p_btn4.click(lambda h, o: answer_doubt(h, "Explain real-world and systems applications of Stacks versus Queues in C++", o), [chatbot, orch_state], [chatbot, chat_msg])
 
-port = int(os.environ.get("PORT", "7860"))
-demo.queue().launch(server_name="0.0.0.0", server_port=port)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", "7860"))
+    demo.queue().launch(server_name="0.0.0.0", server_port=port)
