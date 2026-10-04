@@ -1665,30 +1665,13 @@ def resolve_doubt_offline(query: str, orch: Orchestrator | None) -> str:
         "*(Once Gemini is connected, you can ask any question — from general conversation, debugging C++ code, to complex B.Tech exam problems — and receive instant answers!)*"
     )
 
-def connect_gemini_key(key: str) -> str:
-    key_str = (key or "").strip()
-    if not key_str:
-        return "ℹ️ *Please enter your Gemini API key (starts with AIzaSy...)*"
-    GEMINI.refresh(key_str)
-    if GEMINI.live:
-        test_reply = GEMINI.generate("Reply with 'Connected' in one word.")
-        if test_reply:
-            return "🟢 **Gemini AI Connected & Active!** You can now ask any question."
-        elif GEMINI.last_error:
-            return f"⚠️ **Connection Error:** {GEMINI.last_error}"
-    return "⚠️ Could not connect to Gemini with this key. Check key format."
-
-def answer_doubt(history: list[dict[str, str]], user_msg: str, orch: Orchestrator | None, api_key_input: str = "") -> tuple[list[dict[str, str]], str, Any]:
+def answer_doubt(history: list[dict[str, str]], user_msg: str, orch: Orchestrator | None) -> tuple[list[dict[str, str]], str]:
     if not user_msg or not user_msg.strip():
-        return history, "", gr.update()
+        return history, ""
 
     query = user_msg.strip()
     history = list(history or [])
     history.append({"role": "user", "content": query})
-
-    # Dynamically refresh Gemini with input key if provided
-    if api_key_input and api_key_input.strip() and not GEMINI.live:
-        GEMINI.refresh(api_key_input.strip())
 
     sys_prompt = (
         "You are an encouraging, expert B.Tech Computer Science & Engineering professor and conversational AI tutor. "
@@ -1699,16 +1682,16 @@ def answer_doubt(history: list[dict[str, str]], user_msg: str, orch: Orchestrato
         "Curriculum Subjects: Probability and Statistics, DSA C++, ADBMS, Fundamentals of AI."
     )
 
-    # 1. Try Gemini API (Primary engine)
+    # 1. Try Gemini API (Active when GEMINI_API_KEY is configured in deployment/env)
     if not GEMINI.live and GEMINI_API_KEY.strip():
         GEMINI.refresh(GEMINI_API_KEY.strip())
 
     if GEMINI.live:
-        context_lines = []
+        context_lines: list[str] = []
         for m in history[-6:]:
             speaker = "Student" if m["role"] == "user" else "Tutor"
             context_lines.append(f"{speaker}: {m['content']}")
-        chat_context = "\n".join(context_lines)
+        chat_context = chr(10).join(context_lines)
         prompt = (
             f"Conversation History:\n{chat_context}\n\n"
             f"Student's Latest Input: {query}\n\n"
@@ -1717,7 +1700,7 @@ def answer_doubt(history: list[dict[str, str]], user_msg: str, orch: Orchestrato
         bot_reply = GEMINI.generate(prompt, system_instruction=sys_prompt)
         if bot_reply and bot_reply.strip():
             history.append({"role": "assistant", "content": bot_reply.strip()})
-            return history, "", "🟢 **Gemini AI Active**"
+            return history, ""
 
     # 2. Try OpenAI API as fallback
     if LLM.live:
@@ -1733,18 +1716,14 @@ def answer_doubt(history: list[dict[str, str]], user_msg: str, orch: Orchestrato
             bot_reply = r.choices[0].message.content
             if bot_reply and bot_reply.strip():
                 history.append({"role": "assistant", "content": bot_reply.strip()})
-                return history, "", "🟢 **OpenAI Active**"
+                return history, ""
         except Exception:
             pass
 
     # 3. Offline knowledge base and greeting handler
     bot_reply = resolve_doubt_offline(query, orch)
     history.append({"role": "assistant", "content": bot_reply})
-    status_note = (
-        f"⚠️ **Gemini Error:** {GEMINI.last_error}" if GEMINI.last_error
-        else "ℹ️ *Offline Mode (Enter Gemini API key above to activate live AI answers)*"
-    )
-    return history, "", status_note
+    return history, ""
 
 # ==============================================================================
 # UI RENDERING HELPERS
@@ -2346,24 +2325,8 @@ with gr.Blocks(theme=THEME, css=CSS, title="AI Study Planner & Performance Agent
                     analytics_html = gr.HTML(EMPTY)
 
             # Interactive AI Doubt Solver Chatbot
-            with gr.Accordion("🤖 Gemini AI Doubt Solver & Concept Tutor (Ask any doubt)", open=True):
+            with gr.Accordion("🤖 AI Doubt Solver & Concept Tutor (Ask any doubt)", open=True):
                 gr.Markdown("Have a doubt about an MCQ question, why an option was right or wrong, or any B.Tech concept? Ask below:")
-
-                with gr.Row():
-                    gemini_key_input = gr.Textbox(
-                        label="🔑 Gemini API Key (Enter key here to chat live with Google Gemini)",
-                        placeholder="Paste your Gemini API key (AIzaSy...) here",
-                        value=GEMINI_API_KEY,
-                        type="password",
-                        scale=4
-                    )
-                    connect_key_btn = gr.Button("Connect Gemini Key", variant="secondary", scale=1)
-
-                chat_status_msg = gr.Markdown(
-                    "🟢 **Gemini AI Ready & Connected**" if GEMINI.live
-                    else "ℹ️ *Enter your Gemini API key above or in line 32 of code to chat live with Gemini!*"
-                )
-
                 chatbot = gr.Chatbot(label="Study Doubts Chatbot", height=320, type="messages")
                 with gr.Row():
                     chat_msg = gr.Textbox(
@@ -2381,7 +2344,7 @@ with gr.Blocks(theme=THEME, css=CSS, title="AI Study Planner & Performance Agent
                     p_btn3 = gr.Button("Poisson vs Binomial distribution", size="sm")
                     p_btn4 = gr.Button("Stack vs Queue applications in DSA", size="sm")
 
-# --- Reactive Event Wiring ---
+    # --- Reactive Event Wiring ---
     VIEW = [timeline_html, table_md, summary_html, analytics_html]
 
     s_exam.change(update_cal, [s_exam], [cal_html])
@@ -2412,17 +2375,14 @@ with gr.Blocks(theme=THEME, css=CSS, title="AI Study Planner & Performance Agent
     )
 
     # Chatbot Handlers
-    connect_key_btn.click(connect_gemini_key, [gemini_key_input], [chat_status_msg])
-    gemini_key_input.change(connect_gemini_key, [gemini_key_input], [chat_status_msg])
-
-    send_btn.click(answer_doubt, [chatbot, chat_msg, orch_state, gemini_key_input], [chatbot, chat_msg, chat_status_msg])
-    chat_msg.submit(answer_doubt, [chatbot, chat_msg, orch_state, gemini_key_input], [chatbot, chat_msg, chat_status_msg])
+    send_btn.click(answer_doubt, [chatbot, chat_msg, orch_state], [chatbot, chat_msg])
+    chat_msg.submit(answer_doubt, [chatbot, chat_msg, orch_state], [chatbot, chat_msg])
     clear_btn.click(list, outputs=[chatbot])
 
-    p_btn1.click(lambda h, o, k: answer_doubt(h, "Explain 2NF vs 3NF with an example", o, k), [chatbot, orch_state, gemini_key_input], [chatbot, chat_msg, chat_status_msg])
-    p_btn2.click(lambda h, o, k: answer_doubt(h, "Why must A* heuristic be admissible and what happens if it overestimates?", o, k), [chatbot, orch_state, gemini_key_input], [chatbot, chat_msg, chat_status_msg])
-    p_btn3.click(lambda h, o, k: answer_doubt(h, "What is the difference between Poisson and Binomial distributions and when is Poisson used as an approximation?", o, k), [chatbot, orch_state, gemini_key_input], [chatbot, chat_msg, chat_status_msg])
-    p_btn4.click(lambda h, o, k: answer_doubt(h, "Explain real-world and systems applications of Stacks versus Queues in C++", o, k), [chatbot, orch_state, gemini_key_input], [chatbot, chat_msg, chat_status_msg])
+    p_btn1.click(lambda h, o: answer_doubt(h, "Explain 2NF vs 3NF with an example", o), [chatbot, orch_state], [chatbot, chat_msg])
+    p_btn2.click(lambda h, o: answer_doubt(h, "Why must A* heuristic be admissible and what happens if it overestimates?", o), [chatbot, orch_state], [chatbot, chat_msg])
+    p_btn3.click(lambda h, o: answer_doubt(h, "What is the difference between Poisson and Binomial distributions and when is Poisson used as an approximation?", o), [chatbot, orch_state], [chatbot, chat_msg])
+    p_btn4.click(lambda h, o: answer_doubt(h, "Explain real-world and systems applications of Stacks versus Queues in C++", o), [chatbot, orch_state], [chatbot, chat_msg])
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "7860"))
