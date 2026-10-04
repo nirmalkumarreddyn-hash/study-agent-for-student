@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 # ==============================================================================
 # OPENAI API KEY CONFIGURATION
 # Paste your OpenAI API key below to enable dynamic AI MCQ generation:
-OPENAI_API_KEY = "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"   # <-- PASTE YOUR OPENAI API KEY HERE (e.g. "sk-proj-...")
+OPENAI_API_KEY = ""   # <-- PASTE YOUR OPENAI API KEY HERE (e.g. "sk-proj-...")
 # ==============================================================================
 
 if OPENAI_API_KEY.strip():
@@ -277,13 +277,14 @@ class LLMClient:
     def refresh(self, api_key: str = "") -> None:
         key = (api_key or "").strip() or OPENAI_API_KEY.strip() or os.environ.get("OPENAI_API_KEY", "").strip()
         self._client, self.failures = None, 0
+        self.last_error = ""
         if key:
             os.environ["OPENAI_API_KEY"] = key
             try:
                 from openai import OpenAI
-                self._client = OpenAI(api_key=key, timeout=30)
+                self._client = OpenAI(api_key=key, timeout=25)
             except Exception as exc:
-                self.last_error = str(exc)[:120]
+                self.last_error = f"OpenAI client error: {exc}"[:180]
 
     @property
     def live(self) -> bool:
@@ -291,20 +292,30 @@ class LLMClient:
             self.refresh()
         return self._client is not None
 
-    def json_chat(self, system: str, user: str) -> dict | None:
+    def json_chat(self, system: str, user: str, temperature: float = 0.8) -> dict | None:
         if not self.live:
             return None
         try:
             r = self._client.chat.completions.create(
-                model=self.MODEL, temperature=0.3, response_format={"type": "json_object"},
-                messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
+                model=self.MODEL,
+                temperature=temperature,
+                response_format={"type": "json_object"},
+                messages=[{"role": "system", "content": system}, {"role": "user", "content": user}]
+            )
             self.failures = 0
+            self.last_error = ""
             raw_text = r.choices[0].message.content or ""
             raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text.strip(), flags=re.MULTILINE)
             raw_text = re.sub(r"\s*```$", "", raw_text.strip(), flags=re.MULTILINE)
             return json.loads(raw_text)
         except Exception as exc:
-            self.last_error = str(exc)[:120]
+            err_msg = str(exc)
+            if "invalidated" in err_msg.lower() or "invalid api key" in err_msg.lower() or "401" in err_msg:
+                self.last_error = "OpenAI Error 401: API key has been invalidated or is invalid. Please supply a valid key from platform.openai.com."
+            elif "quota" in err_msg.lower() or "insufficient_quota" in err_msg.lower() or "429" in err_msg:
+                self.last_error = "OpenAI Error 429: Account quota exceeded. Check your OpenAI billing or usage limits."
+            else:
+                self.last_error = f"OpenAI Error: {err_msg[:140]}"
             self.failures += 1
             return None
 
@@ -866,59 +877,239 @@ class SchedulerAgent(ReActAgent):
 
 
 def generate_procedural_syllabus_mcq(t: TopicState) -> QuizQuestion:
-    """Procedurally synthesizes an MCQ directly from syllabus concepts when no OpenAI API key is active."""
+    """Procedurally synthesizes diverse, non-repeating MCQs from syllabus concepts when offline or without an active API key."""
+    import random
     clean_name = t.name.split(":")[-1].strip() if ":" in t.name else t.name
     subject = t.subject
+    q_type = random.randint(1, 5)
 
     if "Probability" in subject or "Statistics" in subject:
-        question = f"In {subject}, which of the following statements is fundamentally correct regarding '{clean_name}'?"
-        options = [
-            f"A) The core analytical properties of {clean_name} satisfy formal probability axioms and valid sample space constraints.",
-            f"B) '{clean_name}' only applies to deterministic variables with zero variance.",
-            f"C) Distribution parameters and moments are invariant under arbitrary non-linear transformations in {clean_name}.",
-            f"D) '{clean_name}' cannot be analyzed using estimation or hypothesis testing."
-        ]
-        correct = options[0]
-        explanation = f"In Probability and Statistics, {clean_name} is governed by probability axioms, distribution laws, and rigorous parameter estimation."
+        if q_type == 1:
+            question = f"In Probability and Statistics, what is the fundamental mathematical condition required for '{clean_name}'?"
+            options = [
+                f"A) Satisfying non-negativity and total probability summation/integration equaling 1 across the sample space of {clean_name}.",
+                f"B) Having a continuous uniform density regardless of whether the variable is discrete or continuous in {clean_name}.",
+                f"C) Requiring the median and arithmetic mean to always be identical for {clean_name}.",
+                f"D) Ensuring that conditional probability P(A|B) is always strictly greater than joint probability P(A ∩ B)."
+            ]
+            correct = options[0]
+            explanation = f"For any probability distribution or random variable concept in '{clean_name}', total probability over the sample space must strictly equal 1 with non-negative density/mass values."
+        elif q_type == 2:
+            question = f"When evaluating parameter estimations and variance in '{clean_name}', which property holds true?"
+            options = [
+                f"A) An estimator is unbiased if its expected value equals the true population parameter of {clean_name}.",
+                f"B) Sample variance always overestimates population variance when divided by (n - 1) in {clean_name}.",
+                f"C) Variance can be negative for distributions with high negative skewness in {clean_name}.",
+                f"D) The standard error increases as the sample size n increases."
+            ]
+            correct = options[0]
+            explanation = f"In statistical estimation for '{clean_name}', unbiasedness requires E[θ^] = θ, and sample variance uses (n - 1) degrees of freedom to correct Bessel's bias."
+        elif q_type == 3:
+            question = f"Which common analytical pitfall must be avoided when modeling real-world data with '{clean_name}'?"
+            options = [
+                f"A) Confusing correlation with causation and assuming linearity without validating residual distribution in {clean_name}.",
+                f"B) Assuming standard deviation is measured in squared units of the original random variable.",
+                f"C) Applying the Central Limit Theorem to sample means when sample size n exceeds 30.",
+                f"D) Using cumulative distribution functions (CDF) whose limits span from 0 to 1."
+            ]
+            correct = options[0]
+            explanation = f"In '{clean_name}', correlation measures only the strength of linear association and does not imply direct causal dependency."
+        elif q_type == 4:
+            question = f"In hypothesis testing and sampling theory relevant to '{clean_name}', what is a Type I error (α)?"
+            options = [
+                f"A) Rejecting the null hypothesis (H0) when it is actually true.",
+                f"B) Failing to reject the null hypothesis (H0) when it is false.",
+                f"C) Calculating a p-value strictly greater than the chosen significance level.",
+                f"D) Setting the power of the test (1 - β) equal to zero."
+            ]
+            correct = options[0]
+            explanation = f"A Type I error (α) represents a false positive — rejecting a true null hypothesis in hypothesis testing."
+        else:
+            question = f"How does '{clean_name}' contribute to predictive modeling and probabilistic inference in engineering?"
+            options = [
+                f"A) By characterizing probability density functions and quantifying uncertainty bounds for {clean_name}.",
+                f"B) By converting stochastic processes into deterministic linear equations with zero variance.",
+                f"C) By guaranteeing that all random outcomes occur with identical uniform probability.",
+                f"D) By eliminating the need for independent and identically distributed (i.i.d.) assumptions."
+            ]
+            correct = options[0]
+            explanation = f"'{clean_name}' allows engineers to formalize uncertainty, calculate expected loss, and establish confidence bounds."
+
     elif "DSA" in subject or "C++" in subject:
-        question = f"In C++ Data Structures and Algorithms, what is the primary consideration when implementing '{clean_name}'?"
-        options = [
-            f"A) Balancing asymptotic time complexity (Big-O) and memory locality according to the access patterns of {clean_name}.",
-            f"B) '{clean_name}' always guarantees O(1) worst-case time for all operations without memory allocation.",
-            f"C) In modern C++, {clean_name} cannot be used alongside STL containers or standard iterators.",
-            f"D) Dynamic memory management and pointer boundaries can be ignored when working with {clean_name}."
-        ]
-        correct = options[0]
-        explanation = f"In C++ DSA, {clean_name} requires careful analysis of asymptotic complexity, pointer/reference semantics, and cache-friendly layout."
+        if q_type == 1:
+            question = f"In C++ Data Structures and Algorithms, what is the primary asymptotic complexity consideration for '{clean_name}'?"
+            options = [
+                f"A) Analyzing average vs worst-case Big-O bounds and memory locality for access operations in {clean_name}.",
+                f"B) Assuming all insertions and deletions execute in O(1) time irrespective of pointer rebinding.",
+                f"C) That memory overhead is always zero when using dynamic heap allocation in C++.",
+                f"D) That recursive traversal of {clean_name} requires O(1) auxiliary call stack space."
+            ]
+            correct = options[0]
+            explanation = f"Implementing '{clean_name}' in C++ demands rigorous analysis of Big-O complexity alongside CPU cache performance and continuous memory locality."
+        elif q_type == 2:
+            question = f"When managing memory and pointers in C++ for '{clean_name}', which best practice prevents leaks?"
+            options = [
+                f"A) Adhering to RAII principles using smart pointers (std::unique_ptr / std::shared_ptr) or explicit destructor cleanup for {clean_name}.",
+                f"B) Never deallocating memory allocated with 'new' to prevent dangling references.",
+                f"C) Using raw pointer arithmetic without validating buffer boundary conditions.",
+                f"D) Relying on automatic garbage collection in standard unmanaged C++."
+            ]
+            correct = options[0]
+            explanation = f"C++ does not have a garbage collector. Applying Resource Acquisition Is Initialization (RAII) ensures {clean_name} resources are freed deterministically."
+        elif q_type == 3:
+            question = f"Which algorithmic paradigm or standard container is most effectively paired with '{clean_name}' in modern C++?"
+            options = [
+                f"A) Standard Template Library (STL) iterators and sequence containers designed for {clean_name}.",
+                f"B) Unbounded recursion without a base termination condition.",
+                f"C) Global mutable arrays that violate modular encapsulation.",
+                f"D) Linear search across sorted data structures instead of logarithmic divide-and-conquer."
+            ]
+            correct = options[0]
+            explanation = f"In modern C++, {clean_name} integrates with STL abstractions, iterators, and generic algorithms (std::sort, std::find) for optimal throughput."
+        elif q_type == 4:
+            question = f"What is a critical edge case to test when validating an implementation of '{clean_name}' in C++?"
+            options = [
+                f"A) Empty container states, single-element boundaries, and capacity overflow/underflow in {clean_name}.",
+                f"B) Compiling without a main() entry point.",
+                f"C) Ensuring integer values never equal zero.",
+                f"D) Restricting inputs strictly to powers of 2."
+            ]
+            correct = options[0]
+            explanation = f"Edge cases for {clean_name} invariably include empty boundaries, single nodes, duplicate keys, and memory boundary conditions."
+        else:
+            question = f"Compared to alternative data structures, what is the core architectural trade-off of '{clean_name}'?"
+            options = [
+                f"A) Trading space overhead for faster lookup or structured FIFO/LIFO/hierarchical access in {clean_name}.",
+                f"B) Sacrificing deterministic ordering for non-deterministic memory addresses.",
+                f"C) Forcing all element types to be statically typed as void pointers.",
+                f"D) Preventing random access even when underlying storage is contiguous."
+            ]
+            correct = options[0]
+            explanation = f"'{clean_name}' provides specialized access patterns (e.g. LIFO for Stacks, FIFO for Queues, contiguous caching for Arrays) at the cost of specific operational trade-offs."
+
     elif "ADBMS" in subject or "Database" in subject:
-        question = f"In Advanced Database Management Systems (ADBMS), what is the key design objective of '{clean_name}'?"
-        options = [
-            f"A) Ensuring transaction consistency, data integrity, and structural efficiency under concurrent access constraints in {clean_name}.",
-            f"B) Maximizing unnecessary data redundancy and permitting unconstrained transitive dependencies.",
-            f"C) Disabling transaction logs and bypassing ACID recovery protocols in {clean_name}.",
-            f"D) Restricting all schemas to un-normalized first normal form (1NF) indefinitely."
-        ]
-        correct = options[0]
-        explanation = f"In ADBMS, {clean_name} focuses on schema normalization, transactional isolation, concurrency control, or scalable distributed storage."
+        if q_type == 1:
+            question = f"In Advanced Database Management Systems (ADBMS), how does '{clean_name}' ensure transactional correctness?"
+            options = [
+                f"A) Enforcing ACID properties (Atomicity, Consistency, Isolation, Durability) or serializability during execution of {clean_name}.",
+                f"B) Permitting dirty reads (Read Uncommitted) as the mandatory default for financial transactions.",
+                f"C) Disabling write-ahead logging (WAL) to minimize disk input/output operations.",
+                f"D) Allowing unconstrained cascading rollbacks without recovery checkpoints."
+            ]
+            correct = options[0]
+            explanation = f"In ADBMS, '{clean_name}' maintains database consistency by enforcing ACID guarantees and preventing concurrency anomalies like lost updates and dirty reads."
+        elif q_type == 2:
+            question = f"When optimizing schema design and relational architecture in '{clean_name}', which objective is paramount?"
+            options = [
+                f"A) Eliminating insertion, update, and deletion anomalies while minimizing unnecessary data redundancy in {clean_name}.",
+                f"B) Maximizing transitive functional dependencies across all non-prime attributes.",
+                f"C) Decomposing tables into un-normalized relations with repeated attribute groups.",
+                f"D) Ensuring that foreign key constraints are completely disabled."
+            ]
+            correct = options[0]
+            explanation = f"Relational design in '{clean_name}' uses normalization (1NF, 2NF, 3NF, BCNF) to eliminate modification anomalies and preserve dependency preservation."
+        elif q_type == 3:
+            question = f"What is the difference between pessimistic locking and optimistic concurrency control regarding '{clean_name}'?"
+            options = [
+                f"A) Pessimistic schemes lock resources beforehand (e.g. 2PL), whereas optimistic schemes validate conflict only at commit time.",
+                f"B) Optimistic concurrency control prevents all read operations during transaction execution.",
+                f"C) Pessimistic schemes cannot cause deadlocks under any concurrent workload.",
+                f"D) Timestamp-based protocols require manual user approval for each SQL query."
+            ]
+            correct = options[0]
+            explanation = f"In ADBMS concurrency control, pessimistic approaches assume conflicts will occur and acquire shared/exclusive locks early, whereas optimistic schemes validate read/write phases before commit."
+        elif q_type == 4:
+            question = f"How does indexing and storage structure (e.g. B+ Trees, Hashing) impact query execution in '{clean_name}'?"
+            options = [
+                f"A) B+ Trees provide logarithmic range queries and keep all actual record pointers in leaf nodes for efficient disk block access.",
+                f"B) Hash indexing is superior to B+ Trees for range and inequality queries (> and <).",
+                f"C) Adding secondary indexes improves the throughput of high-frequency INSERT and DELETE operations.",
+                f"D) Clustered indexes alter the logical query syntax without affecting physical disk storage order."
+            ]
+            correct = options[0]
+            explanation = f"In file structures and indexing for '{clean_name}', B+ Trees are standard because leaf nodes are linked sequentially, facilitating O(log N) point queries and high-speed range scans."
+        else:
+            question = f"In NoSQL systems and MongoDB data aggregation related to '{clean_name}', which paradigm applies?"
+            options = [
+                f"A) Schema-flexible document models utilizing pipeline stages ($match, $group, $project) for distributed data transformation.",
+                f"B) Strict adherence to 3NF relational schemas with mandatory foreign key joins.",
+                f"C) Storing data purely as binary relational tables without JSON/BSON representations.",
+                f"D) Disallowing horizontal sharding across distributed cluster nodes."
+            ]
+            correct = options[0]
+            explanation = f"In MongoDB and NoSQL architectures for '{clean_name}', document databases utilize BSON aggregation pipelines for high-throughput distributed processing."
+
     else:  # AI / FAI
-        question = f"In Artificial Intelligence, what is the principal role of '{clean_name}' in intelligent agent design?"
-        options = [
-            f"A) Formulating state representations and algorithmic search or inference strategies to reach goal states efficiently.",
-            f"B) Forcing the agent to select actions randomly without evaluating heuristic utility.",
-            f"C) Disallowing the use of knowledge representations and environmental percepts in {clean_name}.",
-            f"D) Eliminating exponential time complexity across all combinatorial state spaces."
-        ]
-        correct = options[0]
-        explanation = f"In Artificial Intelligence, {clean_name} provides structured state formulations, heuristic evaluation, or automated reasoning."
+        if q_type == 1:
+            question = f"In Artificial Intelligence, what is the formal problem formulation associated with '{clean_name}'?"
+            options = [
+                f"A) Defining initial states, actions, transition models, goal tests, and path cost functions for {clean_name}.",
+                f"B) Randomly generating state spaces without any objective or evaluation function.",
+                f"C) Assuming that all AI search environments are fully observable, static, and deterministic.",
+                f"D) Restricting agent actions to reactive reflex tables without state memory."
+            ]
+            correct = options[0]
+            explanation = f"In AI problem solving for '{clean_name}', classical formulation requires specifying the 5-tuple: Initial State, Action Set, Transition Model, Goal State Test, and Path Cost."
+        elif q_type == 2:
+            question = f"Regarding heuristic search algorithms (like A*) in '{clean_name}', what does the admissibility condition guarantee?"
+            options = [
+                f"A) That h(n) ≤ h*(n) (never overestimating the true cost to goal), ensuring optimal solutions in tree search.",
+                f"B) That the heuristic value h(n) is always strictly greater than the actual remaining cost.",
+                f"C) That memory consumption remains O(1) throughout state space exploration.",
+                f"D) That depth-first search explores all branches before evaluating heuristic weights."
+            ]
+            correct = options[0]
+            explanation = f"An admissible heuristic never overestimates the true cost to reach the goal ($h(n) <= h^*(n)$). This is essential for A* optimality."
+        elif q_type == 3:
+            question = f"In knowledge representation and logical inference relevant to '{clean_name}', which property holds?"
+            options = [
+                f"A) Sound inference rules guarantee that only sentences that are logically entailed by the knowledge base are derived.",
+                f"B) Forward chaining can only be applied to queries with existential quantifiers in propositional logic.",
+                f"C) Resolution theorem proving does not require converting sentences into Conjunctive Normal Form (CNF).",
+                f"D) A knowledge base is valid if and only if it contains contradictory assertions."
+            ]
+            correct = options[0]
+            explanation = f"Soundness guarantees that an inference mechanism derives only true consequences (entailed sentences) from the knowledge base."
+        elif q_type == 4:
+            question = f"In adversarial game playing and decision making (Minimax / Alpha-Beta) related to '{clean_name}', what is the effect of pruning?"
+            options = [
+                f"A) Alpha-Beta pruning eliminates subtrees that cannot influence the final minimax decision without compromising optimality.",
+                f"B) Pruning reduces the depth of the game tree rather than branching factor.",
+                f"C) Minimax assumes the opponent always plays to maximize the agent's utility.",
+                f"D) Pruning guarantees that the game tree is explored in strictly O(1) time."
+            ]
+            correct = options[0]
+            explanation = f"Alpha-Beta pruning returns the exact same optimal minimax value while pruning branches where α ≥ β, doubling the effective search depth in best-case ordering."
+        else:
+            question = f"What is the principal operational model of a learning agent in '{clean_name}'?"
+            options = [
+                f"A) Dividing architecture into learning element (improver), performance element (actor), critic (evaluator), and problem generator (explorer).",
+                f"B) Eliminating environmental feedback and relying solely on pre-programmed static rules.",
+                f"C) Restricting learning exclusively to supervised classification without exploration.",
+                f"D) Preventing the agent from altering its internal state representation over time."
+            ]
+            correct = options[0]
+            explanation = f"The standard general model of a learning agent divides functionality into: Critic, Learning Element, Performance Element, and Problem Generator."
+
+    # Randomize the option order so correct answer isn't always A
+    import random
+    opt_labels = ["A)", "B)", "C)", "D)"]
+    raw_texts = [o[3:].strip() for o in options]
+    correct_text = raw_texts[0]
+    random.shuffle(raw_texts)
+    
+    final_options = [f"{lbl} {txt}" for lbl, txt in zip(opt_labels, raw_texts)]
+    final_correct = next(opt for opt in final_options if correct_text in opt)
 
     return QuizQuestion(
         topic=t.name, subject=t.subject, question=question,
-        options=options, correct_option=correct, explanation=explanation,
+        options=final_options, correct_option=final_correct, explanation=explanation,
         source="Syllabus Synthesized"
     )
 
 def generate_dynamic_mcq(llm: LLMClient, t: TopicState) -> QuizQuestion:
     """Dynamically generates an MCQ based on syllabus topics using OpenAI LLM if available, or syllabus procedural synthesis."""
+    import random
     if not llm.live:
         llm.refresh()
 
@@ -926,9 +1117,20 @@ def generate_dynamic_mcq(llm: LLMClient, t: TopicState) -> QuizQuestion:
         prereqs = CURRICULUM.get(t.subject, {}).get(t.name, (0.5, []))[1]
         prereq_str = f"Relevant syllabus prerequisites: {', '.join(prereqs)}." if prereqs else ""
 
+        # Diverse angles for generation so repeated questions never happen
+        angles = [
+            "practical scenario and edge-case failure analysis",
+            "asymptotic performance, trade-offs, and optimization",
+            "formal architectural principles and technical definition",
+            "comparative analysis with related engineering mechanisms",
+            "common student misconceptions and tricky bug traps"
+        ]
+        chosen_angle = random.choice(angles)
+        seed_id = random.randint(10000, 99999)
+
         system_prompt = (
             "You are an expert university professor and exam setter for B.Tech Computer Science & Engineering. "
-            "Craft an original, rigorous Multiple Choice Question (MCQ) testing deep conceptual understanding of the "
+            "Craft an original, fresh, and challenging Multiple Choice Question (MCQ) testing deep conceptual understanding of the "
             "given syllabus module. Reply ONLY with a valid JSON object matching this schema:\n"
             "{\n"
             '  "question": "<detailed question text testing core mechanics, algorithms, formulas, or trade-offs>",\n'
@@ -946,11 +1148,13 @@ def generate_dynamic_mcq(llm: LLMClient, t: TopicState) -> QuizQuestion:
             f"Subject: {t.subject}\n"
             f"Syllabus Module: {t.name}\n"
             f"Difficulty: {t.difficulty:.2f} (0.3=Foundational, 0.7=Advanced B.Tech level)\n"
+            f"Question Focus Angle: {chosen_angle}\n"
+            f"Random Variation Seed: {seed_id}\n"
             f"{prereq_str}\n\n"
-            f"Generate an exam-level Multiple Choice Question for this syllabus module."
+            f"Generate a brand new, unique exam-level Multiple Choice Question for this syllabus module."
         )
 
-        data = llm.json_chat(system_prompt, user_prompt)
+        data = llm.json_chat(system_prompt, user_prompt, temperature=0.85)
         if data and isinstance(data, dict):
             raw_opts = data.get("options")
             if isinstance(raw_opts, list) and len(raw_opts) == 4:
@@ -975,7 +1179,6 @@ def generate_dynamic_mcq(llm: LLMClient, t: TopicState) -> QuizQuestion:
                     )
 
     return generate_procedural_syllabus_mcq(t)
-
 
 class EvaluatorAgent(ReActAgent):
     name = "Evaluator Agent"
@@ -1024,36 +1227,45 @@ class EvaluatorAgent(ReActAgent):
         return None
 
     def t_select(self, mem):
+        import random
         st = self.state
         subj_filter = mem.get("subject_filter", "All Subjects")
-        recent = [l.topic for l in st.logs[-8:]]
-        
+        recent = [l.topic for l in st.logs[-12:]]
+
         candidates = list(st.topics.values())
         if subj_filter and subj_filter != "All Subjects":
             candidates = [t for t in candidates if t.subject == subj_filter]
             if not candidates and subj_filter in CURRICULUM:
-                for mod_name in CURRICULUM[subj_filter]:
-                    candidates.append(TopicState(name=mod_name, subject=subj_filter, difficulty=0.5, weight=1.0, mastery=0.5))
+                for mod_name, (diff, pre) in CURRICULUM[subj_filter].items():
+                    candidates.append(TopicState(name=mod_name, subject=subj_filter, difficulty=diff, weight=1.0, mastery=0.5))
 
         if not candidates:
             for sname, mods in CURRICULUM.items():
-                for mname in mods:
-                    candidates.append(TopicState(name=mname, subject=sname, difficulty=0.5, weight=1.0, mastery=0.5))
+                for mname, (diff, pre) in mods.items():
+                    candidates.append(TopicState(name=mname, subject=sname, difficulty=diff, weight=1.0, mastery=0.5))
 
-        ranked = sorted(candidates, key=lambda t: priority(t) - (0.15 if t.name in recent else 0), reverse=True)
+        # Random shuffle with priority weighting so questions rotate dynamically across all 10 modules
+        random.shuffle(candidates)
+        # Sort primarily by least recently tested and priority jitter
+        def jitter_score(t):
+            rec_penalty = 0.40 if t.name in recent else 0.0
+            return (priority(t) + random.uniform(-0.15, 0.15)) - rec_penalty
+
+        ranked = sorted(candidates, key=jitter_score, reverse=True)
         chosen: list[TopicState] = []
-        
+        n_needed = min(mem["n"], len(ranked))
+
         if subj_filter == "All Subjects":
             per: dict[str, int] = {}
             for t in ranked:
-                if per.get(t.subject, 0) < max(1, mem["n"] // 3):
+                if per.get(t.subject, 0) < max(1, n_needed // 3):
                     chosen.append(t)
                     per[t.subject] = per.get(t.subject, 0) + 1
-                if len(chosen) == mem["n"]:
+                if len(chosen) == n_needed:
                     break
 
         for t in ranked:
-            if len(chosen) >= mem["n"]:
+            if len(chosen) >= n_needed:
                 break
             if t not in chosen:
                 chosen.append(t)
@@ -1244,11 +1456,11 @@ DOUBT_KB = {
         "$$\\mathbf{f(n) = g(n) + h(n)}$$\n"
         "- $g(n)$: Exact path cost from start node to $n$.\n"
         "- $h(n)$: Estimated heuristic cost from $n$ to goal.\n\n"
-        "**Admissibility Condition:** $h(n) \\le h^*(n)$ (the heuristic must never overestimate true cost).\n"
-        "**Consistency (Monotonicity):** $h(n) \\le c(n, a, n') + h(n')$ (satisfies the triangle inequality).\n"
+        "**Admissibility Condition:** $h(n) <= h^*(n)$ (the heuristic must never overestimate true cost).\n"
+        "**Consistency (Monotonicity):** $h(n) <= c(n, a, n') + h(n')$ (satisfies the triangle inequality).\n"
         "If $h$ is admissible, Tree-Search A* is guaranteed optimal!"
     ),
-    "admissible": "### Admissible Heuristic in AI Search\n\nA heuristic $h(n)$ is **admissible** if it never overestimates the true cost to reach the goal, meaning $h(n) \\le h^*(n)$ for all $n$.\n- If a heuristic overestimates, A* might prematurely prune the true shortest path and return a suboptimal route.",
+    "admissible": "### Admissible Heuristic in AI Search\n\nA heuristic $h(n)$ is **admissible** if it never overestimates the true cost to reach the goal, meaning $h(n) <= h^*(n)$ for all $n$.\n- If a heuristic overestimates, A* might prematurely prune the true shortest path and return a suboptimal route.",
     "bfs": "### BFS (Breadth-First Search)\n\n- **Mechanism:** Explores level by level using a **FIFO Queue**.\n- **Completeness:** Yes (if branching factor $b$ is finite).\n- **Optimality:** Yes, for uniform step costs.\n- **Time Complexity:** $O(b^d)$\n- **Space Complexity:** $O(b^d)$ (high memory usage).",
     "dfs": "### DFS (Depth-First Search)\n\n- **Mechanism:** Explores deepest unvisited branch first using a **LIFO Stack**.\n- **Completeness:** No (can get stuck in infinite depth loops).\n- **Optimality:** No (may return a deeper non-optimal goal).\n- **Time Complexity:** $O(b^m)$\n- **Space Complexity:** $O(b \\cdot m)$ (very light linear memory).",
     "poisson": (
@@ -1257,7 +1469,7 @@ DOUBT_KB = {
         "- **PMF:** $P(X = k) = \\frac{\\lambda^k e^{-\\lambda}}{k!}$\n"
         "- **Mean:** $E[X] = \\lambda$\n"
         "- **Variance:** $Var(X) = \\lambda$\n\n"
-        "💡 *Poisson Approximation to Binomial:* When $n$ is very large ($n \\ge 100$) and $p$ is very small ($p \\le 0.01$), Binomial($n, p$) is approximated by Poisson with $\\lambda = n \\cdot p$."
+        "💡 *Poisson Approximation to Binomial:* When $n$ is very large ($n \\ge 100$) and $p$ is very small ($p <= 0.01$), Binomial($n, p$) is approximated by Poisson with $\\lambda = n \\cdot p$."
     ),
     "binomial": "### Binomial Distribution\n\nModels the number of successes in $n$ independent Bernoulli trials with constant success probability $p$.\n- **PMF:** $P(X = k) = \\binom{n}{k} p^k (1-p)^{n-k}$\n- **Mean:** $np$\n- **Variance:** $np(1-p)$",
     "central limit": (
@@ -1783,24 +1995,34 @@ def make_quiz(orch, subject_filter, n):
 
     n = int(n)
     qs = orch.make_quiz(n, subject_filter=subject_filter)
-    
+
     group_updates = []
     title_updates = []
     radio_updates = []
-    
+
     for i in range(max_q):
         if i < len(qs):
             q = qs[i]
             group_updates.append(gr.update(visible=True))
-            title_updates.append(f"### Q{i + 1}. {q.topic} `[{q.subject}]`\n**{q.question}**")
+            tag = "🤖 AI" if q.source == "OpenAI Generated" else "📚 Syllabus"
+            title_updates.append(f"### Q{i + 1}. {q.topic} `[{q.subject}]` *({tag})*\n**{q.question}**")
             radio_updates.append(gr.update(visible=True, choices=q.options, value=None, label="Select one option:"))
         else:
             group_updates.append(gr.update(visible=False))
             title_updates.append("")
             radio_updates.append(gr.update(visible=False, choices=[], value=None))
 
-    source_note = "🤖 Dynamically generated by OpenAI LLM" if LLM.live else "📚 Dynamically generated from Syllabus"
-    status_msg = f"**{source_note}: {len(qs)} Questions.** Select your options and click Submit below."
+    openai_count = sum(1 for q in qs if q.source == "OpenAI Generated")
+    if openai_count > 0:
+        status_msg = f"**🤖 Dynamically generated by OpenAI ({LLM.MODEL}): {len(qs)} fresh questions.** Select your options and click Submit below."
+    elif LLM.last_error:
+        status_msg = (
+            f"**⚠️ OpenAI Notice:** {LLM.last_error}<br>"
+            f"*(Generated {len(qs)} diverse questions using dynamic syllabus engine with randomized options.)*"
+        )
+    else:
+        status_msg = f"**📚 Dynamically generated from Syllabus: {len(qs)} Questions.** (Paste a valid OpenAI API key in code to enable live AI generation)."
+
     return (orch, status_msg, *group_updates, *title_updates, *radio_updates, gr.update(visible=bool(qs)), "", *view(orch))
 
 def submit_quiz(orch, *answers):
